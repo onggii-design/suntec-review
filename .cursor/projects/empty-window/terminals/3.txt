@@ -1,0 +1,21 @@
+---
+pid: 17468
+cwd: |
+  C:\Users\limrl
+---
+PS C:\Users\limrl> git init
+git : The term 'git' is not recognized as the name of a cmdlet, 
+function, script file, or operable program. Check the spelling of the 
+name, or if a path was included, verify that the path is correct and 
+try again.
+At line:1 char:1
++ git init
++ ~~~
+    + CategoryInfo          : ObjectNotFound: (git:String) [], CommandN 
+   otFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+PS C:\Users\limrl> 
+ *  History restored 
+
+PS C:\Users\limrl> 
