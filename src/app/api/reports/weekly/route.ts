@@ -31,13 +31,11 @@ export async function GET(request: Request) {
     .gte("review_created_at", oneWeekAgo.toISOString());
 
   const { data: allTimeData } = await supabase
-    .from("reviews")
-    .select("location_id, rating");
+    .rpc("get_location_avg_ratings");
 
-  const allTimeMap: Record<string, number[]> = {};
+  const allTimeMap: Record<string, { avg: number; count: number }> = {};
   for (const r of allTimeData ?? []) {
-    if (!allTimeMap[r.location_id]) allTimeMap[r.location_id] = [];
-    allTimeMap[r.location_id].push(r.rating);
+    allTimeMap[r.location_id] = { avg: parseFloat(r.avg_rating), count: Number(r.total_count) };
   }
 
   type LocData = { name: string; ratings: number[]; bad: number; replied: number; comments: string[] };
@@ -65,8 +63,8 @@ export async function GET(request: Request) {
   let msg1 = `📊 <b>Weekly Review Report</b>\n${fmt(weekStart)} – ${fmt(now)}\n\n`;
   for (const [lid, loc] of Object.entries(byLocation)) {
     const weekAvg = loc.ratings.length > 0 ? (loc.ratings.reduce((a, b) => a + b, 0) / loc.ratings.length).toFixed(1) : "N/A";
-    const allRatings = allTimeMap[lid] ?? [];
-    const allAvg = allRatings.length > 0 ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(1) : "N/A";
+    const allTime = allTimeMap[lid];
+    const allAvg = allTime ? allTime.avg.toFixed(1) : "N/A";
     msg1 += `🏪 <b>${loc.name}</b>\n`;
     msg1 += `⭐ This week: ${weekAvg} | All-time: ${allAvg}\n`;
     msg1 += `📝 Reviews this week: ${loc.ratings.length}\n`;
