@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     .gte("review_created_at", oneWeekAgo.toISOString());
 
   const { data: allTimeData } = await supabase
-    .rpc("get_location_avg_ratings");
+    .rpc("get_location_avg_ratings") as { data: { location_id: string; avg_rating: string; total_count: string }[] | null, error: unknown };
 
   const allTimeMap: Record<string, { avg: number; count: number }> = {};
   for (const r of allTimeData ?? []) {
