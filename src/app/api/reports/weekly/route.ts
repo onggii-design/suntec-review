@@ -27,12 +27,12 @@ export async function GET(request: Request) {
 
   const { data: weekReviews } = await supabase
     .from("reviews")
-    .select("rating, reply_status, comment, locations(name)")
+    .select("rating, reply_status, comment, location_id, locations(name)")
     .gte("review_created_at", oneWeekAgo.toISOString());
 
   const { data: allReviews } = await supabase
     .from("reviews")
-    .select("rating, locations(name)");
+    .select("rating, location_id");
 
   type LocData = { name: string; ratings: number[]; bad: number; replied: number; comments: string[]; allRatings: number[] };
   const byLocation: Record<string, LocData> = {};
@@ -40,17 +40,17 @@ export async function GET(request: Request) {
   for (const review of weekReviews ?? []) {
     const loc = review.locations as { name: string } | null;
     const name = loc?.name ?? "Unknown";
-    if (!byLocation[name]) byLocation[name] = { name, ratings: [], bad: 0, replied: 0, comments: [], allRatings: [] };
-    byLocation[name].ratings.push(review.rating);
-    if (review.rating <= 3) byLocation[name].bad++;
-    if (review.reply_status === "published") byLocation[name].replied++;
-    if (review.comment) byLocation[name].comments.push(`[${review.rating}★] ${review.comment}`);
+    const lid = review.location_id;
+    if (!byLocation[lid]) byLocation[lid] = { name, ratings: [], bad: 0, replied: 0, comments: [], allRatings: [] };
+    byLocation[lid].ratings.push(review.rating);
+    if (review.rating <= 3) byLocation[lid].bad++;
+    if (review.reply_status === "published") byLocation[lid].replied++;
+    if (review.comment) byLocation[lid].comments.push(`[${review.rating}★] ${review.comment}`);
   }
 
   for (const review of allReviews ?? []) {
-    const loc = review.locations as { name: string } | null;
-    const name = loc?.name ?? "Unknown";
-    if (byLocation[name]) byLocation[name].allRatings.push(review.rating);
+    const lid = review.location_id;
+    if (byLocation[lid]) byLocation[lid].allRatings.push(review.rating);
   }
 
   const total = (weekReviews ?? []).length;
