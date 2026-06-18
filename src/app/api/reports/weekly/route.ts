@@ -30,28 +30,28 @@ export async function GET(request: Request) {
     .select("rating, reply_status, comment, location_id, locations(name)")
     .gte("review_created_at", oneWeekAgo.toISOString());
 
-  const { data: allReviews } = await supabase
+  const { data: allTimeData } = await supabase
     .from("reviews")
-    .select("rating, location_id")
-    .limit(15000);
+    .select("location_id, rating");
 
-  type LocData = { name: string; ratings: number[]; bad: number; replied: number; comments: string[]; allRatings: number[] };
+  const allTimeMap: Record<string, number[]> = {};
+  for (const r of allTimeData ?? []) {
+    if (!allTimeMap[r.location_id]) allTimeMap[r.location_id] = [];
+    allTimeMap[r.location_id].push(r.rating);
+  }
+
+  type LocData = { name: string; ratings: number[]; bad: number; replied: number; comments: string[] };
   const byLocation: Record<string, LocData> = {};
 
   for (const review of weekReviews ?? []) {
     const loc = review.locations as { name: string } | null;
     const name = loc?.name ?? "Unknown";
     const lid = review.location_id;
-    if (!byLocation[lid]) byLocation[lid] = { name, ratings: [], bad: 0, replied: 0, comments: [], allRatings: [] };
+    if (!byLocation[lid]) byLocation[lid] = { name, ratings: [], bad: 0, replied: 0, comments: [] };
     byLocation[lid].ratings.push(review.rating);
     if (review.rating <= 3) byLocation[lid].bad++;
     if (review.reply_status === "published") byLocation[lid].replied++;
     if (review.comment) byLocation[lid].comments.push(`[${review.rating}★] ${review.comment}`);
-  }
-
-  for (const review of allReviews ?? []) {
-    const lid = review.location_id;
-    if (byLocation[lid]) byLocation[lid].allRatings.push(review.rating);
   }
 
   const total = (weekReviews ?? []).length;
@@ -63,9 +63,10 @@ export async function GET(request: Request) {
   const fmt = (d: Date) => d.toLocaleDateString("en-SG", { day: "numeric", month: "short" });
 
   let msg1 = `📊 <b>Weekly Review Report</b>\n${fmt(weekStart)} – ${fmt(now)}\n\n`;
-  for (const loc of Object.values(byLocation)) {
+  for (const [lid, loc] of Object.entries(byLocation)) {
     const weekAvg = loc.ratings.length > 0 ? (loc.ratings.reduce((a, b) => a + b, 0) / loc.ratings.length).toFixed(1) : "N/A";
-    const allAvg = loc.allRatings.length > 0 ? (loc.allRatings.reduce((a, b) => a + b, 0) / loc.allRatings.length).toFixed(1) : "N/A";
+    const allRatings = allTimeMap[lid] ?? [];
+    const allAvg = allRatings.length > 0 ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(1) : "N/A";
     msg1 += `🏪 <b>${loc.name}</b>\n`;
     msg1 += `⭐ This week: ${weekAvg} | All-time: ${allAvg}\n`;
     msg1 += `📝 Reviews this week: ${loc.ratings.length}\n`;
@@ -88,15 +89,15 @@ Here are this week's reviews:
 ${sample}
 
 Write a summary under 200 words total with exactly this format:
-Top Concerns:
+🔴 Top Concerns:
 - [concern 1]
 - [concern 2]
 
-Top Praises:
+🟢 Top Praises:
 - [praise 1]
 - [praise 2]
 
-Action Recommended:
+🚨 Action Needed:
 - [specific action 1]
 - [specific action 2]
 
