@@ -32,7 +32,8 @@ export async function GET(request: Request) {
 
   const { data: allReviews } = await supabase
     .from("reviews")
-    .select("rating, location_id");
+    .select("rating, location_id")
+    .limit(15000);
 
   type LocData = { name: string; ratings: number[]; bad: number; replied: number; comments: string[]; allRatings: number[] };
   const byLocation: Record<string, LocData> = {};
