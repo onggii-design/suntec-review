@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-  const { data: reviews } = await supabase
+  const { data: weekReviews } = await supabase
     .from("reviews")
     .select("rating, reply_status, comment, locations(name)")
     .gte("review_created_at", oneWeekAgo.toISOString());
@@ -34,39 +34,45 @@ export async function GET(request: Request) {
     .from("reviews")
     .select("rating, locations(name)");
 
-  const byLocation: Record<string, { name: string; ratings: number[]; bad: number; replied: number; comments: string[] }> = {};
+  type LocData = { name: string; ratings: number[]; bad: number; replied: number; comments: string[]; allRatings: number[] };
+  const byLocation: Record<string, LocData> = {};
 
-  for (const review of reviews ?? []) {
+  for (const review of weekReviews ?? []) {
     const loc = review.locations as { name: string } | null;
     const name = loc?.name ?? "Unknown";
-    if (!byLocation[name]) byLocation[name] = { name, ratings: [], bad: 0, replied: 0, comments: [] };
+    if (!byLocation[name]) byLocation[name] = { name, ratings: [], bad: 0, replied: 0, comments: [], allRatings: [] };
     byLocation[name].ratings.push(review.rating);
     if (review.rating <= 3) byLocation[name].bad++;
     if (review.reply_status === "published") byLocation[name].replied++;
     if (review.comment) byLocation[name].comments.push(`[${review.rating}★] ${review.comment}`);
   }
 
-  const total = (reviews ?? []).length;
-  const totalReplied = (reviews ?? []).filter(r => r.reply_status === "published").length;
+  for (const review of allReviews ?? []) {
+    const loc = review.locations as { name: string } | null;
+    const name = loc?.name ?? "Unknown";
+    if (byLocation[name]) byLocation[name].allRatings.push(review.rating);
+  }
+
+  const total = (weekReviews ?? []).length;
+  const totalReplied = (weekReviews ?? []).filter(r => r.reply_status === "published").length;
   const replyRate = total > 0 ? Math.round((totalReplied / total) * 100) : 0;
 
   const now = new Date();
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7);
   const fmt = (d: Date) => d.toLocaleDateString("en-SG", { day: "numeric", month: "short" });
 
-  // MESSAGE 1 — Numbers
   let msg1 = `📊 <b>Weekly Review Report</b>\n${fmt(weekStart)} – ${fmt(now)}\n\n`;
   for (const loc of Object.values(byLocation)) {
-    const avg = loc.ratings.length > 0 ? (loc.ratings.reduce((a, b) => a + b, 0) / loc.ratings.length).toFixed(1) : "N/A";
+    const weekAvg = loc.ratings.length > 0 ? (loc.ratings.reduce((a, b) => a + b, 0) / loc.ratings.length).toFixed(1) : "N/A";
+    const allAvg = loc.allRatings.length > 0 ? (loc.allRatings.reduce((a, b) => a + b, 0) / loc.allRatings.length).toFixed(1) : "N/A";
     msg1 += `🏪 <b>${loc.name}</b>\n`;
-    msg1 += `⭐ Avg rating: ${avg}\n`;
-    msg1 += `📝 Reviews: ${loc.ratings.length}\n`;
+    msg1 += `⭐ This week: ${weekAvg} | All-time: ${allAvg}\n`;
+    msg1 += `📝 Reviews this week: ${loc.ratings.length}\n`;
     msg1 += `😡 Bad reviews (1-3★): ${loc.bad}\n\n`;
   }
   msg1 += `📌 Overall reply rate: ${replyRate}%`;
   await sendTelegram(msg1);
 
-  // MESSAGE 2 — AI Summary per location
   for (const loc of Object.values(byLocation)) {
     if (loc.comments.length === 0) continue;
     const sample = loc.comments.slice(0, 20).join("\n");
@@ -98,8 +104,7 @@ Be specific and actionable. No intro or outro text.`
     });
 
     const summary = aiRes.content[0].type === "text" ? aiRes.content[0].text.trim() : "";
-    const msg2 = `🏪 <b>${loc.name} — Weekly Insights</b>\n\n${summary}`;
-    await sendTelegram(msg2);
+    await sendTelegram(`🏪 <b>${loc.name} — Weekly Insights</b>\n\n${summary}`);
   }
 
   return NextResponse.json({ ok: true, locations: Object.keys(byLocation), total });
