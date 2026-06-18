@@ -30,6 +30,10 @@ export async function GET(request: Request) {
     .select("rating, reply_status, comment, locations(name)")
     .gte("review_created_at", oneWeekAgo.toISOString());
 
+  const { data: allReviews } = await supabase
+    .from("reviews")
+    .select("rating, locations(name)");
+
   const byLocation: Record<string, { name: string; ratings: number[]; bad: number; replied: number; comments: string[] }> = {};
 
   for (const review of reviews ?? []) {
