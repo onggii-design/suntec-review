@@ -6,6 +6,10 @@
     {
       "path": "/api/google/sync-reviews",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/reports/weekly",
+      "schedule": "0 1 * * 1"
     }
   ]
 }
