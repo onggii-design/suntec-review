@@ -109,9 +109,25 @@ export async function runSyncReviews(
         (existingReviews ?? []).map((review) => review.google_review_id)
       );
 
-      summary.new += rows.filter(
-        (row) => !existingIds.has(row.google_review_id)
-      ).length;
+      const newRows = rows.filter((row) => !existingIds.has(row.google_review_id));
+      summary.new += newRows.length;
+
+      // Send Telegram alerts for new bad reviews (1-3 stars)
+      const badReviews = newRows.filter((row) => row.rating <= 3);
+      for (const review of badReviews) {
+        const stars = "★".repeat(review.rating) + "☆".repeat(5 - review.rating);
+        const comment = review.comment ?? "(no comment)";
+        const msg = `🚨 <b>Bad Review Alert</b>\n\n${stars} ${review.rating}/5\n<b>Location:</b> ${location.name}\n<b>Review:</b> ${comment.slice(0, 300)}\n\n<a href="https://suntec-review.vercel.app/inbox">Reply in inbox</a>`;
+        const token = process.env.TELEGRAM_BOT_TOKEN;
+        const chatId = process.env.TELEGRAM_CHAT_ID;
+        if (token && chatId) {
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: "HTML" }),
+          });
+        }
+      }
 
       const { error: upsertError } = await supabase
         .from("reviews")
