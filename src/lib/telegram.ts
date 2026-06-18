@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 
 export async function sendTelegramAlert(message: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
