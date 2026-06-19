@@ -93,10 +93,26 @@ RULES FOR POSITIVE WITH COMMENTS:
 
 Write the reply now:`;
 
+  // Fetch recent published replies to learn from
+  const { data: publishedReplies } = await supabase
+    .from("reviews")
+    .select("rating, comment, reply_text")
+    .eq("reply_status", "published")
+    .not("reply_text", "is", null)
+    .not("comment", "is", null)
+    .order("replied_at", { ascending: false })
+    .limit(15);
+
+  const examples = (publishedReplies ?? [])
+    .map(r => `Review (${r.rating}★): "${r.comment}"\nReply: "${r.reply_text}"`)
+    .join("\n\n---\n\n");
+
+  const examplesSection = examples ? `\n\nHere are recent real replies we have published - learn from these to match our exact tone and style:\n\n${examples}` : "";
+
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content: prompt + examplesSection }],
   });
 
   const draft = message.content[0].type === "text" ? message.content[0].text.trim() : "";
