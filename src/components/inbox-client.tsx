@@ -261,7 +261,8 @@ export function InboxClient({ reviews: initial }: { reviews: InboxReview[] }) {
 
   const filtered = reviews.filter((r) => {
     if (brand !== "all" && r.location_name !== brand) return false;
-    if (status !== "all" && r.reply_status !== status) return false;
+    if (status === "pending" && r.reply_status === "published") return false;
+    if (status !== "all" && status !== "pending" && r.reply_status !== status) return false;
     if (rating !== "all" && r.rating !== Number(rating)) return false;
     return true;
   });
