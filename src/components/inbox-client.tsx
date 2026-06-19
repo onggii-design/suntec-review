@@ -13,7 +13,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import type { InboxReview } from "@/app/inbox/page";
 import type { ReplyStatus } from "@/lib/supabase/types";
 
-type FilterBrand = "all" | "Onggii" | "Sotpot";
+type FilterBrand = "all" | "onggii (Suntec City)" | "onggii (NEX)";
 type FilterStatus = "all" | ReplyStatus;
 type FilterRating = "all" | "1" | "2" | "3" | "4" | "5";
 
@@ -260,7 +260,7 @@ export function InboxClient({ reviews: initial }: { reviews: InboxReview[] }) {
   }
 
   const filtered = reviews.filter((r) => {
-    if (brand !== "all" && r.brand_name !== brand) return false;
+    if (brand !== "all" && r.location_name !== brand) return false;
     if (status !== "all" && r.reply_status !== status) return false;
     if (rating !== "all" && r.rating !== Number(rating)) return false;
     return true;
@@ -298,9 +298,9 @@ export function InboxClient({ reviews: initial }: { reviews: InboxReview[] }) {
               <SelectValue placeholder="Brand" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All brands</SelectItem>
-              <SelectItem value="Onggii">Onggii</SelectItem>
-              <SelectItem value="Sotpot">Sotpot</SelectItem>
+              <SelectItem value="all">All locations</SelectItem>
+              <SelectItem value="onggii (Suntec City)">Onggii Suntec City</SelectItem>
+              <SelectItem value="onggii (NEX)">Onggii NEX</SelectItem>
             </SelectContent>
           </Select>
 
