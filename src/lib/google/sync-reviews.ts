@@ -113,11 +113,21 @@ export async function runSyncReviews(
       summary.new += newRows.length;
 
       // Send Telegram alerts for new bad reviews (1-3 stars)
-      const badReviews = newRows.filter((row) => row.rating <= 3);
+      // Only for Onggii locations (skip Koggii), only reviews from last 24 hours
+      const isOnggii = location.name.toLowerCase().includes("onggii");
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const badReviews = newRows.filter((row) =>
+        row.rating <= 3 &&
+        isOnggii &&
+        new Date(row.review_created_at) >= yesterday
+      );
       for (const review of badReviews) {
         const stars = "★".repeat(review.rating) + "☆".repeat(5 - review.rating);
         const comment = review.comment ?? "(no comment)";
-        const msg = `🚨 <b>Bad Review Alert</b>\n\n${stars} ${review.rating}/5\n<b>Location:</b> ${location.name}\n<b>Review:</b> ${comment.slice(0, 300)}\n\n<a href="https://suntec-review.vercel.app/inbox">Reply in inbox</a>`;
+        const reviewDate = new Date(review.review_created_at).toLocaleDateString("en-SG", {
+          day: "numeric", month: "short", year: "numeric"
+        });
+        const msg = `🚨 <b>Bad Review Alert</b>\n\n${stars} ${review.rating}/5\n<b>Location:</b> ${location.name}\n<b>Date:</b> ${reviewDate}\n<b>Review:</b> ${comment.slice(0, 300)}\n\n<a href="https://suntec-review.vercel.app/inbox">Reply in inbox</a>`;
         const token = process.env.TELEGRAM_BOT_TOKEN;
         const chatId = process.env.TELEGRAM_CHAT_ID;
         if (token && chatId) {
