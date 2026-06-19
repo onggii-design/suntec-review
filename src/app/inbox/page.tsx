@@ -28,7 +28,8 @@ export default async function InboxPage() {
   const { data, error } = await supabase
     .from("reviews")
     .select(`id, google_review_id, reviewer_name, rating, comment, review_created_at, reply_text, reply_status, replied_at, locations(name, brands(name))`)
-    .order("review_created_at", { ascending: false });
+    .order("review_created_at", { ascending: false })
+    .not("location_id", "eq", "588e0624-a7a6-4525-8436-d5076578652e");
 
   if (error) {
     return (
