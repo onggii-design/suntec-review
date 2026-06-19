@@ -127,7 +127,8 @@ export async function runSyncReviews(
         const reviewDate = new Date(review.review_created_at).toLocaleDateString("en-SG", {
           day: "numeric", month: "short", year: "numeric"
         });
-        const msg = `🚨 <b>Bad Review Alert</b>\n\n${stars} ${review.rating}/5\n<b>Location:</b> ${location.name}\n<b>Date:</b> ${reviewDate}\n<b>Review:</b> ${comment.slice(0, 300)}\n\n<a href="https://suntec-review.vercel.app/inbox">Reply in inbox</a>`;
+        const reviewer = review.reviewer_name ?? "Anonymous";
+        const msg = `🚨 <b>Bad Review Alert</b>\n\n${stars} ${review.rating}/5\n<b>Location:</b> ${location.name}\n<b>Date:</b> ${reviewDate}\n<b>Reviewer:</b> ${reviewer}\n<b>Review:</b> ${comment.slice(0, 300)}\n\n<a href="https://suntec-review.vercel.app/inbox">Reply in inbox</a>`;
         const token = process.env.TELEGRAM_BOT_TOKEN;
         const chatId = process.env.TELEGRAM_CHAT_ID;
         if (token && chatId) {
