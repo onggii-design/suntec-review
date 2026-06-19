@@ -18,6 +18,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const loc = review.locations as { name: string; brands: { name: string } } | null;
   const brandName = loc?.brands?.name ?? "our restaurant";
   const locationName = loc?.name ?? "";
+  const reviewerName = review.reviewer_name ?? "Valued Guest";
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
