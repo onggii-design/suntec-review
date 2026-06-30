@@ -12,9 +12,14 @@ export async function POST(
   const session = await getAuthenticatedSession();
   if (!session?.accessToken) return unauthorizedResponse();
 
-  const body = await request.json();
-  const { reply_text } = body as { reply_text: string };
+  let body: { reply_text?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
+  const { reply_text } = body;
   if (!reply_text?.trim()) {
     return NextResponse.json({ error: "Reply text is required" }, { status: 400 });
   }
@@ -35,7 +40,15 @@ export async function POST(
     session.refreshToken
   );
 
-  await postReviewReply(tokenProvider, review.google_review_id, reply_text);
+  try {
+    await postReviewReply(tokenProvider, review.google_review_id, reply_text);
+  } catch (err) {
+    console.error("postReviewReply failed", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to post reply to Google" },
+      { status: 502 }
+    );
+  }
 
   const { error: updateError } = await supabase
     .from("reviews")
