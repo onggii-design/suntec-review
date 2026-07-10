@@ -9,10 +9,12 @@ import {
   mapGoogleReviewToRow,
 } from "@/lib/google/reviews";
 import { createClient } from "@/lib/supabase/server";
+import { autoReplyToGoodReviews } from "@/lib/google/auto-reply";
 
 export type SyncReviewsSummary = {
   synced: number;
   new: number;
+  autoReplied: number;
   errors: string[];
 };
 
@@ -23,6 +25,7 @@ export async function runSyncReviews(
   const summary: SyncReviewsSummary = {
     synced: 0,
     new: 0,
+    autoReplied: 0,
     errors: [],
   };
 
@@ -112,20 +115,21 @@ export async function runSyncReviews(
       const newRows = rows.filter((row) => !existingIds.has(row.google_review_id));
       summary.new += newRows.length;
 
-      // Send Telegram alerts for new bad reviews (1-3 stars)
-      // Only for Onggii locations (skip Koggii), only reviews from last 24 hours
       const isOnggii = location.name.toLowerCase().includes("onggii");
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const badReviews = newRows.filter((row) =>
-        row.rating <= 3 &&
-        isOnggii &&
-        new Date(row.review_created_at) >= yesterday
+
+      // Send Telegram alerts for new bad reviews (1-3 stars)
+      const badReviews = newRows.filter(
+        (row) =>
+          row.rating <= 3 &&
+          isOnggii &&
+          new Date(row.review_created_at) >= yesterday
       );
       for (const review of badReviews) {
         const stars = "★".repeat(review.rating) + "☆".repeat(5 - review.rating);
         const comment = review.comment ?? "(no comment)";
         const reviewDate = new Date(review.review_created_at).toLocaleDateString("en-SG", {
-          day: "numeric", month: "short", year: "numeric"
+          day: "numeric", month: "short", year: "numeric",
         });
         const reviewer = review.reviewer_name ?? "Anonymous";
         const msg = `🚨 <b>Bad Review Alert</b>\n\n${stars} ${review.rating}/5\n<b>Location:</b> ${location.name}\n<b>Date:</b> ${reviewDate}\n<b>Reviewer:</b> ${reviewer}\n<b>Review:</b> ${comment}\n\n<a href="https://suntec-review.vercel.app/inbox">Reply in inbox</a>`;
@@ -152,6 +156,23 @@ export async function runSyncReviews(
       }
 
       summary.synced += rows.length;
+
+      // Auto-reply to new 4/5 star Onggii reviews
+      if (isOnggii && newRows.length > 0) {
+        const goodReviewIds = newRows
+          .filter((row) => row.rating >= 4)
+          .map((row) => row.google_review_id);
+
+        if (goodReviewIds.length > 0) {
+          const autoReplied = await autoReplyToGoodReviews(
+            tokenProvider,
+            goodReviewIds,
+            location.name,
+            summary.errors
+          );
+          summary.autoReplied += autoReplied;
+        }
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown sync error";
