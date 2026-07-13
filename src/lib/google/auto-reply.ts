@@ -55,7 +55,7 @@ export async function autoReplyToGoodReviews(
     .select("id, google_review_id, rating, comment, reviewer_name")
     .eq("location_id", locationId)
     .gte("rating", 4)
-    .is("reply_status", null);
+    .eq("reply_status", "pending");
 
   if (error || !reviews?.length) return 0;
 
