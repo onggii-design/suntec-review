@@ -30,28 +30,17 @@ export async function runSyncReviews(
   };
 
   const supabase = createClient();
-  const tokenProvider = new GoogleAccessTokenProvider(
-    accessToken,
-    refreshToken
-  );
+  const tokenProvider = new GoogleAccessTokenProvider(accessToken, refreshToken);
 
   const { data: locations, error: locationsError } = await supabase
     .from("locations")
     .select("id, google_location_id, name");
 
-  if (locationsError) {
-    throw new Error(locationsError.message);
-  }
-
-  if (!locations?.length) {
-    return summary;
-  }
+  if (locationsError) throw new Error(locationsError.message);
+  if (!locations?.length) return summary;
 
   const accountNames = await fetchGoogleAccountNames(accessToken, refreshToken);
-  const locationLookup = await buildLocationResourceNameLookup(
-    accessToken,
-    refreshToken
-  );
+  const locationLookup = await buildLocationResourceNameLookup(accessToken, refreshToken);
 
   if (accountNames.length === 0) {
     summary.errors.push("No Google Business accounts found for this user.");
@@ -73,14 +62,8 @@ export async function runSyncReviews(
         continue;
       }
 
-      const googleReviews = await fetchLocationReviews(
-        tokenProvider,
-        fullLocationPath
-      );
-
-      if (googleReviews.length === 0) {
-        continue;
-      }
+      const googleReviews = await fetchLocationReviews(tokenProvider, fullLocationPath);
+      if (googleReviews.length === 0) continue;
 
       const rows = googleReviews
         .map((review) => mapGoogleReviewToRow(review, location.id))
@@ -92,9 +75,7 @@ export async function runSyncReviews(
         );
       }
 
-      if (rows.length === 0) {
-        continue;
-      }
+      if (rows.length === 0) continue;
 
       const { data: existingReviews, error: existingError } = await supabase
         .from("reviews")
@@ -118,12 +99,9 @@ export async function runSyncReviews(
       const isOnggii = location.name.toLowerCase().includes("onggii");
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      // Send Telegram alerts for new bad reviews (1-3 stars)
+      // Telegram alerts for new bad reviews
       const badReviews = newRows.filter(
-        (row) =>
-          row.rating <= 3 &&
-          isOnggii &&
-          new Date(row.review_created_at) >= yesterday
+        (row) => row.rating <= 3 && isOnggii && new Date(row.review_created_at) >= yesterday
       );
       for (const review of badReviews) {
         const stars = "★".repeat(review.rating) + "☆".repeat(5 - review.rating);
@@ -157,31 +135,19 @@ export async function runSyncReviews(
 
       summary.synced += rows.length;
 
-      // Auto-reply to new 4/5 star Onggii reviews
-      if (isOnggii && newRows.length > 0) {
-        const goodReviewIds = newRows
-          .filter((row) => row.rating >= 4)
-          .map((row) => row.google_review_id);
-
-        if (goodReviewIds.length > 0) {
-          const autoReplied = await autoReplyToGoodReviews(
-            tokenProvider,
-            goodReviewIds,
-            location.name,
-            summary.errors
-          );
-          summary.autoReplied += autoReplied;
-        }
+      // Auto-reply to all unreplied 4/5 star Onggii reviews
+      if (isOnggii) {
+        const autoReplied = await autoReplyToGoodReviews(
+          tokenProvider,
+          location.id,
+          location.name,
+          summary.errors
+        );
+        summary.autoReplied += autoReplied;
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown sync error";
-
-      console.error(
-        `Failed to sync reviews for location ${location.name}:`,
-        error
-      );
-
+      const message = error instanceof Error ? error.message : "Unknown sync error";
+      console.error(`Failed to sync reviews for location ${location.name}:`, error);
       summary.errors.push(`${location.name}: ${message}`);
     }
   }
