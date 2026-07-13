@@ -54,7 +54,7 @@ export async function autoReplyToGoodReviews(
     .from("reviews")
     .select("id, google_review_id, rating, comment, reviewer_name")
     .eq("location_id", locationId)
-    .limit(10)
+    .limit(50)
     .gte("rating", 4)
     .eq("reply_status", "pending");
 
