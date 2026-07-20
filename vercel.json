@@ -5,11 +5,11 @@
   "crons": [
     {
       "path": "/api/google/sync-reviews",
-      "schedule": "0 0 * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/reports/weekly",
-      "schedule": "0 1 * * 1"
+      "schedule": "0 7 * * 1"
     }
   ]
 }
