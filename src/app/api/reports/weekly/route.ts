@@ -8,11 +8,21 @@ async function sendTelegram(msg: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return;
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: "HTML" }),
   });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("Telegram send failed:", err);
+    // Retry without parse_mode
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text: msg }),
+    });
+  }
 }
 
 export async function GET(request: Request) {
@@ -30,7 +40,6 @@ export async function GET(request: Request) {
     .select("rating, reply_status, comment, location_id, locations(name)")
     .gte("review_created_at", oneWeekAgo.toISOString());
 
-  // Get all-time ratings via raw fetch to bypass type issues
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const allTimeResp = await fetch(
@@ -87,14 +96,19 @@ export async function GET(request: Request) {
   await sendTelegram(msg1);
 
   for (const loc of Object.values(byLocation)) {
-    if (loc.comments.length === 0) continue;
+    if (loc.comments.length === 0) {
+      await sendTelegram(`🏪 <b>${loc.name} — Weekly Insights</b>\n\nNo comments left this week.`);
+      continue;
+    }
     const sample = loc.comments.slice(0, 20).join("\n");
-    const aiRes = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 400,
-      messages: [{
-        role: "user",
-        content: `You are analysing Google reviews for ${loc.name}, a Korean restaurant in Singapore.
+
+    try {
+      const aiRes = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 400,
+        messages: [{
+          role: "user",
+          content: `You are analysing Google reviews for ${loc.name}, a Korean restaurant in Singapore.
 
 Here are this week's reviews:
 ${sample}
@@ -112,12 +126,16 @@ Write a summary under 200 words total with exactly this format:
 - [specific action 1]
 - [specific action 2]
 
-Be specific and actionable. No intro or outro text.`
-      }]
-    });
+Be specific and actionable. No intro or outro text. Do not use any HTML tags.`
+        }]
+      });
 
-    const summary = aiRes.content[0].type === "text" ? aiRes.content[0].text.trim() : "";
-    await sendTelegram(`🏪 <b>${loc.name} — Weekly Insights</b>\n\n${summary}`);
+      const summary = aiRes.content[0].type === "text" ? aiRes.content[0].text.trim() : "No summary generated.";
+      await sendTelegram(`🏪 ${loc.name} — Weekly Insights\n\n${summary}`);
+    } catch (err) {
+      console.error("AI summary failed for", loc.name, err);
+      await sendTelegram(`🏪 ${loc.name} — Weekly Insights\n\nFailed to generate summary.`);
+    }
   }
 
   return NextResponse.json({ ok: true, locations: Object.keys(byLocation), total });
